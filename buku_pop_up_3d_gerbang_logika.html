@@ -1,0 +1,2274 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Ajar Interaktif: Buku Pop-Up 3D Gerbang Logika</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tone.js untuk efek suara interaktif (halaman & saklar) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- Google Fonts: Cinzel (judul klasik), Inter (teks jelas), JetBrains Mono (biner & tabel) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Cinzel', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            tealbook: '#124e5d',
+            tealdark: '#0a333d',
+            parchment: '#f4e7cf',
+            parchmentDark: '#e3cfa9',
+            brass: '#c89b4b',
+            brassLight: '#f0d593',
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* ===== BASE & CINEMATIC VINTAGE DESK AMBIANCE ===== */
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at 38% 34%, #3d2c20 0%, #221710 56%, #120c08 100%);
+      color: #f8f3e8;
+      overflow-x: hidden;
+    }
+
+    /* Tekstur meja kayu hangat + soft cinematic spotlight */
+    .desk-surface {
+      background-image:
+        radial-gradient(ellipse at 50% 42%, rgba(235, 192, 118, 0.17) 0%, rgba(20, 12, 8, 0) 62%),
+        radial-gradient(circle at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.55) 100%),
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.014) 0px,
+          rgba(255, 255, 255, 0.014) 2px,
+          transparent 2px,
+          transparent 18px
+        );
+    }
+
+    /* ===== FIXED CINEMATIC 3D STAGE (THREE-QUARTER VIEW) ===== */
+    .stage-3d {
+      perspective: 2100px;
+      perspective-origin: 50% 44%;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .book-rig {
+      transform-style: preserve-3d;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform;
+    }
+
+    .book-rig.dragging {
+      transition: none;
+    }
+
+    /* ===== UNIFIED PHYSICAL 3D POP-UP BOOK ASSEMBLY ===== */
+    /* Ukuran konsisten antara kondisi tertutup & terbuka agar tidak ada zoom mendadak */
+    .book-assembly {
+      position: relative;
+      width: 780px;
+      height: 440px;
+      transform-style: preserve-3d;
+      transition: transform 1.05s cubic-bezier(0.32, 0.06, 0.22, 1);
+      will-change: transform;
+    }
+
+    /* Saat tertutup, buku bergeser halus ke tengah meja (sampul berada di sisi kanan engsel) */
+    .book-assembly.is-closed {
+      transform: translateX(-195px);
+    }
+
+    /* Bayangan alas buku di atas meja (ambient occlusion) */
+    .book-desk-shadow {
+      position: absolute;
+      inset: 6px -10px -16px -10px;
+      border-radius: 16px;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.72) 35%, rgba(0, 0, 0, 0) 78%);
+      transform: translateZ(-24px);
+      transition: all 1.05s cubic-bezier(0.32, 0.06, 0.22, 1);
+      pointer-events: none;
+    }
+
+    .book-assembly.is-closed .book-desk-shadow {
+      left: 48%;
+      right: -12px;
+    }
+
+    /* Papan Hardcover Belakang (sisi kanan saat tertutup, penuh saat terbuka) */
+    .hardcover-back-right {
+      position: absolute;
+      top: -10px;
+      bottom: -10px;
+      left: 50%;
+      right: -12px;
+      background: linear-gradient(135deg, #165565 0%, #0d3a46 65%, #07232b 100%);
+      border-radius: 2px 14px 14px 2px;
+      border: 1.5px solid #26778a;
+      transform: translateZ(-16px);
+      box-shadow:
+        6px 10px 24px rgba(0, 0, 0, 0.65),
+        inset -2px 0 4px rgba(255, 255, 255, 0.14);
+    }
+
+    /* Papan Hardcover Kiri (muncul halus menyatu saat sampul terbuka) */
+    .hardcover-back-left {
+      position: absolute;
+      top: -10px;
+      bottom: -10px;
+      left: -12px;
+      right: 50%;
+      background: linear-gradient(225deg, #165565 0%, #0d3a46 65%, #07232b 100%);
+      border-radius: 14px 2px 2px 14px;
+      border: 1.5px solid #26778a;
+      transform: translateZ(-16px);
+      box-shadow:
+        -6px 10px 24px rgba(0, 0, 0, 0.65),
+        inset 2px 0 4px rgba(255, 255, 255, 0.14);
+      transition: opacity 0.45s ease;
+    }
+
+    .book-assembly.is-closed .hardcover-back-left {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Punggung Buku (Spine) 3D di tengah */
+    .book-spine {
+      position: absolute;
+      top: -10px;
+      bottom: -10px;
+      left: calc(50% - 9px);
+      width: 18px;
+      background: linear-gradient(90deg, #07222a 0%, #175464 45%, #0b2f38 100%);
+      border-radius: 4px;
+      transform: translateZ(-13px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Tumpukan Kertas Tebal Berlapis (Ketebalan Kertas Realistis) */
+    .paper-block-left,
+    .paper-block-right {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 50%;
+      transform-style: preserve-3d;
+      transform: translateZ(1px);
+      transition: opacity 0.35s ease 0.25s, transform 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .paper-block-left {
+      left: 0;
+      border-radius: 6px 2px 2px 6px;
+      background: #efe1c6;
+      box-shadow:
+        -3px 3px 0 #dfd0b0,
+        -6px 6px 0 #cfbc97,
+        -9px 9px 0 #bba57d,
+        -12px 12px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    .book-assembly.is-closed .paper-block-left {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease 0.45s;
+    }
+
+    .paper-block-right {
+      right: 0;
+      border-radius: 2px 6px 6px 2px;
+      background: #efe1c6;
+      box-shadow:
+        3px 3px 0 #dfd0b0,
+        6px 6px 0 #cfbc97,
+        9px 9px 0 #bba57d,
+        12px 12px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    /* ===== HINGED FRONT HARDCOVER (BUKA & TUTUP REALISTIS) ===== */
+    .hardcover-front {
+      position: absolute;
+      top: -10px;
+      bottom: -10px;
+      left: 50%;
+      width: calc(50% + 12px);
+      transform-origin: left center;
+      transform-style: preserve-3d;
+      transform: translateZ(12px) rotateY(0deg);
+      transition: transform 1.05s cubic-bezier(0.32, 0.06, 0.22, 1);
+      z-index: 40;
+      cursor: pointer;
+    }
+
+    /* Saat terbuka penuh, sampul depan berada di belakang halaman kiri (Z = -14px) agar tidak menutupi konten */
+    .hardcover-front.is-open {
+      transform: translateZ(-14px) rotateY(-180deg);
+      pointer-events: none;
+    }
+
+    .cover-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 4px 14px 14px 4px;
+      overflow: hidden;
+    }
+
+    .cover-face-front {
+      background: #124e5d;
+      border: 2px solid #2b7f92;
+      box-shadow:
+        inset 16px 0 22px rgba(0, 0, 0, 0.48),
+        inset -2px 0 6px rgba(255, 255, 255, 0.18),
+        4px 6px 0 #d8c59e,
+        7px 9px 18px rgba(0, 0, 0, 0.6);
+    }
+
+    .cover-face-inside {
+      transform: rotateY(180deg);
+      border-radius: 14px 4px 4px 14px;
+      background: linear-gradient(135deg, #e7d6b5 0%, #f5ead4 55%, #d9c49c 100%);
+      border: 6px solid #104553;
+      box-shadow: inset -14px 0 22px rgba(45, 28, 12, 0.3);
+    }
+
+    /* ===== PERMUKAAN HALAMAN KERTAS MATTE & SPINE AMBIENT OCCLUSION ===== */
+    .page-surface {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #f3e6cc;
+      transform-style: preserve-3d;
+    }
+
+    .page-surface-left {
+      border-radius: 6px 0 0 6px;
+    }
+
+    .page-surface-right {
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* Tekstur kertas matte halus */
+    .paper-matte-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(rgba(84, 58, 28, 0.05) 1px, transparent 0),
+        linear-gradient(180deg, rgba(255, 250, 240, 0.08) 0%, rgba(25, 16, 8, 0.08) 100%);
+      background-size: 6px 6px, 100% 100%;
+      pointer-events: none;
+    }
+
+    /* Ambient occlusion lipatan tengah buku (realistis seperti buku fisik terbuka) */
+    .spine-ao-left {
+      position: absolute;
+      inset: 0 0 0 auto;
+      width: 46px;
+      background: linear-gradient(90deg, rgba(35, 20, 8, 0) 0%, rgba(35, 20, 8, 0.16) 60%, rgba(20, 10, 4, 0.42) 100%);
+      pointer-events: none;
+    }
+
+    .spine-ao-right {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 46px;
+      background: linear-gradient(270deg, rgba(35, 20, 8, 0) 0%, rgba(35, 20, 8, 0.16) 60%, rgba(20, 10, 4, 0.42) 100%);
+      pointer-events: none;
+    }
+
+    /* ===== REALISTIC DOUBLE-SIDED CURVED PAGE FLIPPING LEAF ===== */
+    .turning-leaf-stage {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      pointer-events: none;
+      z-index: 55;
+    }
+
+    .turning-leaf {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 50%;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    .turning-leaf.turn-next {
+      left: 50%;
+      transform-origin: left center;
+      animation: paperTurnNext 0.92s cubic-bezier(0.42, 0.04, 0.28, 0.98) forwards;
+    }
+
+    .turning-leaf.turn-prev {
+      left: 0;
+      transform-origin: right center;
+      animation: paperTurnPrev 0.92s cubic-bezier(0.42, 0.04, 0.28, 0.98) forwards;
+    }
+
+    .leaf-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      overflow: hidden;
+      background: #f3e6cc;
+      /* Ketebalan tepi kertas saat berputar */
+      box-shadow: inset 0 0 0 1.5px rgba(215, 195, 158, 0.85);
+    }
+
+    .leaf-face-front {
+      border-radius: 0 6px 6px 0;
+    }
+
+    .leaf-face-back {
+      transform: rotateY(180deg);
+      border-radius: 6px 0 0 6px;
+    }
+
+    .turn-prev .leaf-face-front {
+      border-radius: 6px 0 0 6px;
+    }
+
+    .turn-prev .leaf-face-back {
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* Efek lengkungan cahaya & bayangan pada lembaran kertas yang sedang dibalik */
+    .leaf-curl-sheen {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0%, rgba(255, 250, 238, 0.22) 35%, rgba(0, 0, 0, 0.08) 70%, rgba(0, 0, 0, 0.22) 100%);
+      animation: curlSheenShift 0.92s ease-in-out forwards;
+    }
+
+    /* Bayangan dinamis halaman yang menyapu permukaan buku di bawahnya */
+    .turning-cast-shadow {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      transform: translateZ(3px);
+    }
+
+    .turning-cast-shadow.shadow-next {
+      animation: castShadowNext 0.92s cubic-bezier(0.42, 0.04, 0.28, 0.98) forwards;
+    }
+
+    .turning-cast-shadow.shadow-prev {
+      animation: castShadowPrev 0.92s cubic-bezier(0.42, 0.04, 0.28, 0.98) forwards;
+    }
+
+    @keyframes paperTurnNext {
+      0% {
+        transform: translateZ(6px) rotateY(0deg) skewY(0deg);
+      }
+      28% {
+        transform: translateZ(18px) rotateY(-46deg) skewY(-2.4deg);
+      }
+      50% {
+        transform: translateZ(26px) rotateY(-90deg) skewY(-3.2deg);
+      }
+      76% {
+        transform: translateZ(16px) rotateY(-142deg) skewY(-1.8deg);
+      }
+      100% {
+        transform: translateZ(6px) rotateY(-180deg) skewY(0deg);
+      }
+    }
+
+    @keyframes paperTurnPrev {
+      0% {
+        transform: translateZ(6px) rotateY(0deg) skewY(0deg);
+      }
+      28% {
+        transform: translateZ(18px) rotateY(46deg) skewY(2.4deg);
+      }
+      50% {
+        transform: translateZ(26px) rotateY(90deg) skewY(3.2deg);
+      }
+      76% {
+        transform: translateZ(16px) rotateY(142deg) skewY(1.8deg);
+      }
+      100% {
+        transform: translateZ(6px) rotateY(180deg) skewY(0deg);
+      }
+    }
+
+    @keyframes curlSheenShift {
+      0%   { opacity: 0.1; }
+      45%  { opacity: 0.92; }
+      100% { opacity: 0.12; }
+    }
+
+    @keyframes castShadowNext {
+      0%   { background: linear-gradient(90deg, transparent 50%, rgba(15, 8, 2, 0.06) 100%); }
+      45%  { background: linear-gradient(90deg, rgba(15, 8, 2, 0.02) 15%, rgba(15, 8, 2, 0.44) 50%, rgba(15, 8, 2, 0.18) 85%); }
+      100% { background: linear-gradient(90deg, rgba(15, 8, 2, 0.04) 0%, transparent 50%); }
+    }
+
+    @keyframes castShadowPrev {
+      0%   { background: linear-gradient(270deg, transparent 50%, rgba(15, 8, 2, 0.06) 100%); }
+      45%  { background: linear-gradient(270deg, rgba(15, 8, 2, 0.02) 15%, rgba(15, 8, 2, 0.44) 50%, rgba(15, 8, 2, 0.18) 85%); }
+      100% { background: linear-gradient(270deg, rgba(15, 8, 2, 0.04) 0%, transparent 50%); }
+    }
+
+    /* ===== 3D POP-UP PAPER CRAFT UNFOLDING MECHANISM (LAYERED CUTOUTS) ===== */
+    .popup-stage {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      pointer-events: none;
+      z-index: 25;
+    }
+
+    /* Setiap lapisan pop-up melipat dari garis engsel bawah (folding paper mechanism) */
+    .popup-tier {
+      transform-style: preserve-3d;
+      transform-origin: bottom center;
+      will-change: transform, opacity;
+    }
+
+    .popup-stage.is-folded * {
+      pointer-events: none !important;
+    }
+
+    /* Kondisi terbuka: berdiri tegak berlapis dengan sedikit efek elastis (subtle bounce) */
+    .popup-stage.is-unfolded .popup-tier-1 {
+      transform: translateZ(18px) rotateX(-14deg);
+      opacity: 1;
+      transition:
+        transform 0.68s cubic-bezier(0.22, 1.18, 0.36, 1) 0.04s,
+        opacity 0.28s ease 0.02s;
+    }
+
+    .popup-stage.is-unfolded .popup-tier-2 {
+      transform: translateZ(38px) rotateX(-12deg);
+      opacity: 1;
+      transition:
+        transform 0.72s cubic-bezier(0.22, 1.2, 0.36, 1) 0.16s,
+        opacity 0.28s ease 0.12s;
+    }
+
+    .popup-stage.is-unfolded .popup-tier-3 {
+      transform: translateZ(56px) rotateX(-10deg);
+      opacity: 1;
+      transition:
+        transform 0.72s cubic-bezier(0.22, 1.22, 0.36, 1) 0.28s,
+        opacity 0.28s ease 0.22s;
+    }
+
+    /* Kondisi melipat: setiap elemen turun & melipat masuk ke permukaan kertas secara bertahap (urutan balik) */
+    .popup-stage.is-folded .popup-tier-3 {
+      transform: translateZ(1px) rotateX(88deg);
+      opacity: 0;
+      pointer-events: none;
+      transition:
+        transform 0.38s cubic-bezier(0.55, 0.05, 0.75, 0.25) 0s,
+        opacity 0.16s ease 0.24s;
+    }
+
+    .popup-stage.is-folded .popup-tier-2 {
+      transform: translateZ(1px) rotateX(88deg);
+      opacity: 0;
+      pointer-events: none;
+      transition:
+        transform 0.42s cubic-bezier(0.55, 0.05, 0.75, 0.25) 0.08s,
+        opacity 0.16s ease 0.34s;
+    }
+
+    .popup-stage.is-folded .popup-tier-1 {
+      transform: translateZ(1px) rotateX(88deg);
+      opacity: 0;
+      pointer-events: none;
+      transition:
+        transform 0.44s cubic-bezier(0.55, 0.05, 0.75, 0.25) 0.14s,
+        opacity 0.16s ease 0.42s;
+    }
+
+    /* Bayangan dinamis di atas kertas yang menyusut saat objek pop-up melipat */
+    .popup-ground-shadow {
+      position: absolute;
+      inset: 14% 7% 8% 7%;
+      border-radius: 14px;
+      background: radial-gradient(ellipse at 50% 65%, rgba(24, 14, 5, 0.42) 0%, rgba(24, 14, 5, 0.16) 52%, transparent 78%);
+      transform: translateZ(2px);
+      transition: opacity 0.45s ease, transform 0.55s ease;
+      pointer-events: none;
+    }
+
+    .popup-stage.is-folded .popup-ground-shadow {
+      opacity: 0;
+      transform: translateZ(1px) scaleY(0.25);
+    }
+
+    /* Gaya kartu kertas tebal berlapis (Layered Paper Cutout) */
+    .papercraft-card {
+      border: 2px solid #e9d9b8;
+      box-shadow:
+        0 2px 0 #cdb88f,
+        0 4px 0 #b59e72,
+        0 14px 26px rgba(15, 8, 2, 0.52);
+    }
+
+    .papercraft-banner {
+      background: linear-gradient(180deg, #faf1dd 0%, #ebd9b4 100%);
+      color: #2c1e12;
+      border: 2px solid #c5a875;
+      box-shadow:
+        0 3px 0 #b3925c,
+        0 12px 20px rgba(20, 10, 4, 0.42);
+    }
+
+    /* Saklar mekanik 3D di dalam buku */
+    .mech-switch {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .mech-switch:active {
+      transform: scale(0.94);
+    }
+
+    /* Custom Scrollbar untuk Panel Kanan */
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.25);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(200, 155, 75, 0.45);
+      border-radius: 999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(200, 155, 75, 0.75);
+    }
+
+    /* Animasi gelombang suara saat narator berbicara */
+    @keyframes voiceWave {
+      0%, 100% { transform: scaleY(0.3); }
+      50% { transform: scaleY(1); }
+    }
+    .voice-bar {
+      width: 3px;
+      height: 14px;
+      border-radius: 999px;
+      background: #f0d593;
+      transform-origin: bottom center;
+      animation: voiceWave 0.75s ease-in-out infinite;
+    }
+    .voice-bar:nth-child(2) { animation-delay: 0.15s; }
+    .voice-bar:nth-child(3) { animation-delay: 0.3s; }
+    .voice-bar:nth-child(4) { animation-delay: 0.45s; }
+    .voice-bars-idle .voice-bar {
+      animation: none;
+      transform: scaleY(0.3);
+      opacity: 0.45;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col lg:h-screen lg:overflow-hidden">
+  <!-- ===== TOP HEADER BAR ===== -->
+  <header class="flex-none bg-[#0d2730]/95 border-b border-brass/30 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 z-30 shadow-lg">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brassLight to-brass flex items-center justify-center shadow-inner text-[#12303a] font-display font-black text-lg">
+        GL
+      </div>
+      <div>
+        <h1 class="font-display font-bold text-sm sm:text-base tracking-wide text-brassLight leading-tight">
+          BUKU POP-UP 3D: GERBANG LOGIKA
+        </h1>
+        <p class="text-[11px] text-teal-200/80">
+          Media Ajar Interaktif &bull; Simulasi Rangkaian &amp; Tabel Kebenaran
+        </p>
+      </div>
+    </div>
+
+    <!-- Kontrol Kamera, Overlay & Suara -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="hidden sm:flex items-center bg-[#081c23] rounded-lg p-1 border border-teal-800/70 text-xs">
+        <button onclick="setCameraPreset('iso')" id="cam-iso" class="px-2.5 py-1 rounded-md bg-brass text-[#102930] font-semibold transition">
+          3D Sinematik
+        </button>
+        <button onclick="setCameraPreset('front')" id="cam-front" class="px-2.5 py-1 rounded-md text-teal-100 hover:bg-teal-900/60 transition">
+          Horizontal
+        </button>
+        <button onclick="setCameraPreset('top')" id="cam-top" class="px-2.5 py-1 rounded-md text-teal-100 hover:bg-teal-900/60 transition">
+          Atas
+        </button>
+      </div>
+
+      <button onclick="toggleBookControls()" id="btn-overlay" class="px-3 py-1.5 rounded-lg bg-[#081c23] border border-teal-800/70 text-xs text-teal-100 hover:border-brass/60 flex items-center gap-1.5 transition" title="Tampilkan/Sembunyikan tombol interaktif di atas gambar">
+        <span id="overlay-icon">🎛️</span>
+        <span class="hidden sm:inline" id="overlay-label">Kontrol 3D: Aktif</span>
+      </button>
+
+      <button onclick="toggleSound()" id="btn-sound" class="px-3 py-1.5 rounded-lg bg-[#081c23] border border-teal-800/70 text-xs text-teal-100 hover:border-brass/60 flex items-center gap-1.5 transition" title="Aktifkan/Matikan Efek Suara">
+        <span id="sound-icon">🔊</span>
+        <span class="hidden sm:inline" id="sound-label">Suara Aktif</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== MAIN WORKSPACE: KIRI = PANGGUNG 3D, KANAN = PANEL PENJELASAN ===== -->
+  <main class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+
+    <!-- ===== KOLOM KIRI: PANGGUNG BUKU POP-UP 3D ===== -->
+    <section class="relative flex-1 desk-surface flex flex-col justify-between min-h-[520px] lg:min-h-0 overflow-hidden">
+
+      <!-- Petunjuk interaksi 3D mengambang di pojok kiri atas -->
+      <div class="absolute top-3 left-3 z-20 flex items-center gap-2 bg-black/45 backdrop-blur-md border border-brass/30 px-3 py-1.5 rounded-full text-[11px] text-amber-100/90 pointer-events-none">
+        <span>🖱️ Geser layar untuk putar sudut 3D</span>
+        <span class="hidden md:inline text-brass/80">&bull;</span>
+        <span class="hidden md:inline">Klik saklar 0/1 di buku!</span>
+      </div>
+
+      <!-- Indikator halaman di pojok kanan atas panggung -->
+      <div class="absolute top-3 right-3 z-20 bg-black/45 backdrop-blur-md border border-brass/30 px-3 py-1.5 rounded-full text-xs font-mono text-brassLight">
+        <span id="page-indicator">Sampul (0 / 4)</span>
+      </div>
+
+      <!-- Area Panggung 3D -->
+      <div id="stage-3d" class="stage-3d flex-1 flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden p-4">
+        <div id="book-scale-wrapper" class="transition-transform duration-300">
+          <div id="book-rig" class="book-rig">
+            <!-- Konten Buku 3D dirender secara dinamis oleh JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== NAVIGASI HALAMAN BUKU (BAWAH PANGGUNG) ===== -->
+      <div class="flex-none bg-[#120d0a]/85 backdrop-blur-md border-t border-brass/25 px-4 py-3 flex flex-wrap items-center justify-between gap-2 z-20">
+        <button onclick="prevPage()" id="btn-prev" class="px-3.5 py-2 rounded-xl bg-[#1e3a44] hover:bg-[#284e5c] disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold text-amber-50 border border-teal-700/60 flex items-center gap-1.5 transition">
+          <span>◀</span> Sebelumnya
+        </button>
+
+        <!-- Daftar Bab Cepat -->
+        <div class="flex items-center gap-1.5 overflow-x-auto py-0.5" id="chapter-pills">
+          <button onclick="goToPage(0)" data-page="0" class="chapter-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition">Sampul</button>
+          <button onclick="goToPage(1)" data-page="1" class="chapter-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition">1. Pengantar</button>
+          <button onclick="goToPage(2)" data-page="2" class="chapter-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition">2. AND, OR, NOT</button>
+          <button onclick="goToPage(3)" data-page="3" class="chapter-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition">3. NAND, NOR</button>
+          <button onclick="goToPage(4)" data-page="4" class="chapter-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition">4. XOR, XNOR</button>
+        </div>
+
+        <button onclick="nextPage()" id="btn-next" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-brass to-amber-500 hover:from-amber-400 hover:to-brass text-[#142a30] disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-bold shadow-md flex items-center gap-1.5 transition">
+          Selanjutnya <span>▶</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== KOLOM KANAN: PANEL PENJELASAN INTERAKTIF ===== -->
+    <aside class="w-full lg:w-[410px] xl:w-[440px] flex-none bg-[#0f242c] border-t lg:border-t-0 lg:border-l border-brass/35 flex flex-col lg:h-full shadow-2xl z-20">
+
+      <!-- Tab Switcher Panel Kanan: Penjelasan Materi vs Kuis Cepat -->
+      <div class="flex-none p-3 bg-[#0a1b22] border-b border-teal-900/80 flex items-center gap-2">
+        <button onclick="setRightTab('materi')" id="tab-materi" class="flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold bg-brass text-[#0d2229] shadow transition flex items-center justify-center gap-1.5">
+          <span>📖</span> Panel Penjelasan
+        </button>
+        <button onclick="setRightTab('kuis')" id="tab-kuis" class="flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-teal-200 hover:bg-teal-900/50 transition flex items-center justify-center gap-1.5">
+          <span>🎯</span> Kuis Interaktif
+        </button>
+      </div>
+
+      <!-- Bar Kontrol Narasi Suara (Manual & Otomatis • Bahasa Indonesia • Pria Muda) -->
+      <div id="voice-control-bar" class="flex-none px-3.5 py-2.5 bg-[#0d2129] border-b border-brass/25 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <div id="voice-bars" class="voice-bars-idle flex items-end gap-0.5 h-3.5 flex-none">
+              <span class="voice-bar"></span>
+              <span class="voice-bar"></span>
+              <span class="voice-bar"></span>
+              <span class="voice-bar"></span>
+            </div>
+            <div class="min-w-0">
+              <div class="text-[11px] font-bold text-brassLight truncate flex items-center gap-1.5">
+                <span>🎙️ Narasi Suara</span>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-teal-900/80 text-teal-200 border border-teal-700/60">ID • Pria Muda</span>
+              </div>
+              <p id="voice-status-text" class="text-[10px] text-teal-200/75 truncate">Siap membacakan materi halaman ini</p>
+            </div>
+          </div>
+
+          <!-- Toggle Mode Otomatis -->
+          <button onclick="toggleAutoSpeech()" id="btn-voice-auto"
+            class="flex-none px-2.5 py-1 rounded-lg text-[10px] font-bold border transition flex items-center gap-1 bg-emerald-500/20 border-emerald-400/50 text-emerald-200"
+            title="Otomatis membacakan penjelasan saat halaman berpindah">
+            <span id="voice-auto-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span id="voice-auto-label">Otomatis: Aktif</span>
+          </button>
+        </div>
+
+        <!-- Tombol Kontrol Manual -->
+        <div class="flex items-center gap-1.5">
+          <button onclick="togglePlayPauseSpeech()" id="btn-voice-play"
+            class="flex-1 py-1.5 px-2.5 rounded-lg bg-gradient-to-r from-brass to-amber-500 hover:from-amber-400 hover:to-brass text-[#0d2229] text-[11px] font-bold shadow transition flex items-center justify-center gap-1.5">
+            <span id="voice-play-icon">▶</span>
+            <span id="voice-play-label">Bacakan Halaman</span>
+          </button>
+          <button onclick="speakCurrentPage(false)" id="btn-voice-replay"
+            class="py-1.5 px-2.5 rounded-lg bg-[#14303b] hover:bg-[#1c414f] text-teal-100 border border-teal-700/60 text-[11px] font-semibold transition"
+            title="Ulangi dari awal">
+            ↻ Ulang
+          </button>
+          <button onclick="stopSpeech()" id="btn-voice-stop"
+            class="py-1.5 px-2.5 rounded-lg bg-[#29171b] hover:bg-[#3d2127] text-rose-200 border border-rose-800/60 text-[11px] font-semibold transition"
+            title="Hentikan narasi">
+            ⏹ Stop
+          </button>
+        </div>
+      </div>
+
+      <!-- Konten Scrollable Panel Kanan -->
+      <div id="right-panel-content" class="flex-1 overflow-y-auto custom-scroll p-4 sm:p-5 space-y-4">
+        <!-- Diisi dinamis oleh JavaScript -->
+      </div>
+    </aside>
+  </main>
+
+  <!-- ===== JAVASCRIPT LOGIC ===== -->
+  <script>
+    // =========================================================================
+    // 1. STATE APLIKASI & DATA MATERI GERBANG LOGIKA
+    // =========================================================================
+
+    // Daftar URL gambar resmi dari repositori GitHub pengguna (urut per halaman)
+    const GITHUB_IMAGES = {
+      0: encodeURI('https://nanoronx.github.io/AST-GERBANG-LOGIC/COVER GERBANG LOGIKA.jfif'),
+      1: encodeURI('https://nanoronx.github.io/AST-GERBANG-LOGIC/gerbang logik & tabel kebenaran.jfif'),
+      2: encodeURI('https://nanoronx.github.io/AST-GERBANG-LOGIC/tabel kebenaran and,or,not.jfif'),
+      3: encodeURI('https://nanoronx.github.io/AST-GERBANG-LOGIC/tabel kebenaran nand,nor.jfif'),
+      4: encodeURI('https://nanoronx.github.io/AST-GERBANG-LOGIC/tabel kebenaran xor,xnor.jfif'),
+    };
+
+    // State global aplikasi
+    const state = {
+      currentPage: 0,       // 0: Cover, 1: Overview, 2: AND/OR/NOT, 3: NAND/NOR, 4: XOR/XNOR
+      renderedSpread: 1,    // Halaman isi (1-4) yang sedang terpasang di bawah sampul/lembaran
+      isTransitioning: false,
+      rightTab: 'materi',   // 'materi' | 'kuis'
+      soundEnabled: true,
+      showBookControls: true,
+      audioReady: false,
+      camera: {
+        rotX: 16,           // Sudut three-quarter view stabil sedikit dari atas
+        rotY: 0,
+        preset: 'iso',
+      },
+      inputs: {
+        selectedOverviewGate: 'AND',
+        andA: 1, andB: 1,
+        orA: 1, orB: 0,
+        notA: 1,
+        nandA: 1, nandB: 0,
+        norA: 0, norB: 0,
+        xorA: 0, xorB: 1,
+        xnorA: 1, xnorB: 1,
+      },
+      quiz: {
+        answers: {}, // { qIndex: selectedOptionIndex }
+      },
+      speech: {
+        autoPlay: true,          // Otomatis membacakan penjelasan saat halaman berganti
+        isSpeaking: false,
+        isPaused: false,
+        voiceObj: null,
+        isNativeMale: false,
+        supported: typeof window !== 'undefined' && 'speechSynthesis' in window,
+      },
+    };
+
+    // Naskah narasi Bahasa Indonesia (EYD/PUEBI) untuk setiap halaman buku
+    const PAGE_NARRATIONS = {
+      0: 'Selamat datang di media ajar interaktif Buku Pop-Up Tiga Dimensi Gerbang Logika. Pada buku ini, Anda akan mempelajari tujuh gerbang logika digital beserta tabel kebenarannya secara visual dan interaktif. Silakan klik tombol buka buku untuk memulai pembelajaran.',
+      1: 'Halaman pertama, Peta Konsep Gerbang Logika dan Tabel Kebenaran. Gerbang logika adalah blok pembangun dasar dalam sistem komputer dan elektronika digital yang mengolah sinyal biner, yaitu angka nol untuk kondisi salah atau mati, dan angka satu untuk kondisi benar atau menyala. Terdapat tujuh gerbang utama, yaitu gerbang dasar AND, OR, dan NOT; gerbang universal NAND dan NOR; serta gerbang khusus XOR dan XNOR. Silakan pilih salah satu gerbang pada buku untuk mempelajari detailnya.',
+      2: 'Halaman kedua, Tabel Kebenaran Gerbang Dasar AND, OR, dan NOT. Pertama, gerbang AND akan menghasilkan keluaran satu hanya apabila seluruh masukannya bernilai satu. Kedua, gerbang OR akan menghasilkan keluaran satu apabila salah satu atau seluruh masukannya bernilai satu. Ketiga, gerbang NOT atau pembalik berfungsi membalik nilai masukan; jika masukan bernilai satu maka keluarannya nol, dan jika masukan bernilai nol maka keluarannya satu. Cobalah menekan tombol nol dan satu pada buku untuk melihat simulasi secara langsung.',
+      3: 'Halaman ketiga, Tabel Kebenaran Gerbang Universal NAND dan NOR. Pertama, gerbang NAND merupakan kebalikan dari gerbang AND. Keluarannya akan bernilai nol hanya apabila seluruh masukannya bernilai satu, selain itu keluarannya selalu satu. Kedua, gerbang NOR merupakan kebalikan dari gerbang OR. Keluarannya akan bernilai satu hanya apabila seluruh masukannya bernilai nol. Keduanya disebut gerbang universal karena seluruh rangkaian logika komputer dapat dibentuk hanya dengan menggunakan gerbang ini.',
+      4: 'Halaman keempat, Tabel Kebenaran Gerbang Khusus XOR dan XNOR. Pertama, gerbang XOR atau Exclusive OR menghasilkan keluaran bernilai satu apabila kedua masukannya memiliki nilai yang berbeda, yaitu nol dan satu, atau satu dan nol. Kedua, gerbang XNOR atau Exclusive NOR merupakan kebalikannya, yaitu menghasilkan keluaran bernilai satu apabila kedua masukannya memiliki nilai yang sama, baik keduanya nol maupun keduanya satu. Kedua gerbang ini banyak digunakan pada rangkaian penjumlah biner dan pembanding data.',
+    };
+
+    // Data lengkap 7 Gerbang Logika untuk Panel Penjelasan & Buku 3D
+    const GATE_INFO = {
+      AND: {
+        name: 'Gerbang AND',
+        category: 'Gerbang Dasar',
+        formula: 'Y = A · B',
+        rule: 'Menghasilkan output 1 (TRUE) hanya jika SEMUA input bernilai 1. Jika salah satu atau semua input 0, maka output bernilai 0.',
+        analogy: 'Seperti dua saklar lampu yang dipasang seri: lampu hanya menyala jika kedua saklar dinyalakan bersamaan.',
+        color: 'text-amber-300',
+        badge: 'bg-amber-500/20 text-amber-200 border-amber-400/40',
+        unary: false,
+      },
+      OR: {
+        name: 'Gerbang OR',
+        category: 'Gerbang Dasar',
+        formula: 'Y = A + B',
+        rule: 'Menghasilkan output 1 (TRUE) jika SALAH SATU atau SEMUA input bernilai 1. Output hanya 0 jika semua input bernilai 0.',
+        analogy: 'Seperti dua saklar yang dipasang paralel: lampu tetap menyala meskipun hanya salah satu saklar yang ditekan.',
+        color: 'text-emerald-300',
+        badge: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40',
+        unary: false,
+      },
+      NOT: {
+        name: 'Gerbang NOT (Inverter)',
+        category: 'Gerbang Dasar',
+        formula: 'Y = Ā',
+        rule: 'Membalik (menginversi) nilai input tunggal. Jika input 1 maka output 0, dan jika input 0 maka output 1.',
+        analogy: 'Seperti lampu taman otomatis dengan sensor cahaya: saat siang terang (1) lampu mati (0), saat malam gelap (0) lampu menyala (1).',
+        color: 'text-rose-300',
+        badge: 'bg-rose-500/20 text-rose-200 border-rose-400/40',
+        unary: true,
+      },
+      NAND: {
+        name: 'Gerbang NAND (NOT-AND)',
+        category: 'Gerbang Universal',
+        formula: 'Y = (A · B)′',
+        rule: 'Kebalikan dari gerbang AND. Output bernilai 0 hanya jika semua input bernilai 1; untuk kombinasi lainnya output selalu 1.',
+        analogy: 'Seperti sistem alarm pengaman mesin: mesin tetap bekerja (1) kecuali jika dua tombol darurat ditekan bersamaan (1 & 1) maka mesin berhenti (0).',
+        color: 'text-sky-300',
+        badge: 'bg-sky-500/20 text-sky-200 border-sky-400/40',
+        unary: false,
+      },
+      NOR: {
+        name: 'Gerbang NOR (NOT-OR)',
+        category: 'Gerbang Universal',
+        formula: 'Y = (A + B)′',
+        rule: 'Kebalikan dari gerbang OR. Output bernilai 1 hanya jika SEMUA input bernilai 0; jika ada satu saja input 1, output menjadi 0.',
+        analogy: 'Seperti lampu indikator aman: lampu hijau menyala (1) hanya jika sensor asap (0) dan sensor panas (0) keduanya tidak mendeteksi bahaya.',
+        color: 'text-lime-300',
+        badge: 'bg-lime-500/20 text-lime-200 border-lime-400/40',
+        unary: false,
+      },
+      XOR: {
+        name: 'Gerbang XOR (Exclusive OR)',
+        category: 'Gerbang Khusus',
+        formula: 'Y = A ⊕ B',
+        rule: 'Menghasilkan output 1 (TRUE) hanya jika kedua input BERBEDA (0 & 1 atau 1 & 0). Jika kedua input sama, output bernilai 0.',
+        analogy: 'Seperti saklar tangga dua arah (bawah & atas): mengubah salah satu saklar saja akan menyalakan atau mematikan lampu tangga.',
+        color: 'text-orange-300',
+        badge: 'bg-orange-500/20 text-orange-200 border-orange-400/40',
+        unary: false,
+      },
+      XNOR: {
+        name: 'Gerbang XNOR (Exclusive NOR)',
+        category: 'Gerbang Khusus',
+        formula: 'Y = (A ⊕ B)′',
+        rule: 'Kebalikan dari XOR. Menghasilkan output 1 (TRUE) jika kedua input SAMA (0 & 0 atau 1 & 1). Jika berbeda, output bernilai 0.',
+        analogy: 'Seperti pembanding kata sandi (comparator): menghasilkan sinyal cocok (1) hanya ketika bit yang dimasukkan sama persis dengan bit kunci.',
+        color: 'text-teal-300',
+        badge: 'bg-teal-500/20 text-teal-200 border-teal-400/40',
+        unary: false,
+      },
+    };
+
+    // Data 5 soal Kuis Interaktif
+    const QUIZ_DATA = [
+      {
+        q: 'Jika Input A = 1 dan Input B = 0 masuk ke gerbang AND, berapakah nilai Output Y?',
+        options: ['0 (FALSE)', '1 (TRUE)', 'Tidak terdefinisi'],
+        correct: 0,
+        explain: 'Gerbang AND hanya menghasilkan 1 apabila semua input bernilai 1. Karena B = 0, maka Y = 0.',
+      },
+      {
+        q: 'Gerbang logika manakah yang hanya memiliki 1 input dan berfungsi membalik nilai biner?',
+        options: ['Gerbang OR', 'Gerbang NOT', 'Gerbang XOR'],
+        correct: 1,
+        explain: 'Gerbang NOT (Inverter) menerima satu input dan membalik nilainya (0 menjadi 1, 1 menjadi 0).',
+      },
+      {
+        q: 'Pada gerbang NAND, kombinasi input manakah yang menghasilkan Output Y = 0?',
+        options: ['A = 0, B = 0', 'A = 1, B = 0', 'A = 1, B = 1'],
+        correct: 2,
+        explain: 'NAND adalah kebalikan dari AND. Karena AND menghasilkan 1 saat A=1 dan B=1, maka NAND menghasilkan 0 pada kondisi tersebut.',
+      },
+      {
+        q: 'Gerbang manakah yang menghasilkan output 1 (TRUE) hanya ketika kedua inputnya BERBEDA?',
+        options: ['Gerbang XOR', 'Gerbang XNOR', 'Gerbang NOR'],
+        correct: 0,
+        explain: 'XOR (Exclusive OR) bernilai 1 saat input berbeda (0 & 1 atau 1 & 0), dan bernilai 0 jika keduanya sama.',
+      },
+      {
+        q: 'Jika Input A = 0 dan Input B = 0 masuk ke gerbang XNOR, berapakah nilai Output Y?',
+        options: ['0 (FALSE)', '1 (TRUE)', 'Bergantung pada clock'],
+        correct: 1,
+        explain: 'XNOR menghasilkan 1 apabila kedua input bernilai sama. Karena A = 0 dan B = 0 (sama), maka Y = 1.',
+      },
+    ];
+
+    // Fungsi perhitungan logika biner untuk ke-7 gerbang
+    function calcGate(gate, a, b) {
+      const A = a ? 1 : 0;
+      const B = b ? 1 : 0;
+      switch (gate) {
+        case 'AND':  return (A && B) ? 1 : 0;
+        case 'OR':   return (A || B) ? 1 : 0;
+        case 'NOT':  return A ? 0 : 1;
+        case 'NAND': return (A && B) ? 0 : 1;
+        case 'NOR':  return (A || B) ? 0 : 1;
+        case 'XOR':  return (A !== B) ? 1 : 0;
+        case 'XNOR': return (A === B) ? 1 : 0;
+        default:     return 0;
+      }
+    }
+
+    // =========================================================================
+    // 2. EFEK SUARA INTERAKTIF (TONE.JS - TANPA URL EKSTERNAL)
+    // =========================================================================
+
+    function ensureAudio() {
+      if (!state.soundEnabled || typeof Tone === 'undefined') return false;
+      try {
+        if (Tone.context && Tone.context.state !== 'running') {
+          Tone.start();
+        }
+        state.audioReady = true;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function playSwitchSound(isOn) {
+      if (!ensureAudio()) return;
+      try {
+        const synth = new Tone.Synth({
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.005, decay: 0.08, sustain: 0.01, release: 0.08 },
+          volume: -14,
+        }).toDestination();
+        synth.triggerAttackRelease(isOn ? 'E5' : 'A4', '32n');
+        setTimeout(() => synth.dispose(), 250);
+      } catch (_) {}
+    }
+
+    function playPageFlipSound() {
+      if (!ensureAudio()) return;
+      try {
+        const noise = new Tone.NoiseSynth({
+          noise: { type: 'pink' },
+          envelope: { attack: 0.04, decay: 0.22, sustain: 0, release: 0.1 },
+          volume: -18,
+        }).toDestination();
+        noise.triggerAttackRelease('8n');
+        setTimeout(() => noise.dispose(), 400);
+      } catch (_) {}
+    }
+
+    function toggleSound() {
+      state.soundEnabled = !state.soundEnabled;
+      const icon = document.getElementById('sound-icon');
+      const label = document.getElementById('sound-label');
+      if (icon) icon.textContent = state.soundEnabled ? '🔊' : '🔇';
+      if (label) label.textContent = state.soundEnabled ? 'Suara Aktif' : 'Suara Mati';
+      if (state.soundEnabled) playSwitchSound(true);
+    }
+
+    function toggleBookControls() {
+      state.showBookControls = !state.showBookControls;
+      document.getElementById('overlay-label').textContent = state.showBookControls
+        ? 'Kontrol 3D: Aktif'
+        : 'Mode Gambar Penuh';
+      playSwitchSound(state.showBookControls);
+      updatePopupLayerContent(true);
+    }
+
+    // =========================================================================
+    // 2B. VOICE SPEECH BAHASA INDONESIA (KARAKTER SUARA PRIA MUDA)
+    // =========================================================================
+
+    function pickYoungMaleIndonesianVoice() {
+      if (!state.speech.supported) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return;
+
+      // Filter suara berbahasa Indonesia (id-ID / id_ID / bahasa indonesia)
+      const idVoices = voices.filter((v) =>
+        /^id([-_]|$)/i.test(v.lang) || /indones/i.test(v.name)
+      );
+
+      // Prioritaskan suara pria muda Indonesia (mis. Microsoft Ardi, Andika, Male/Pria)
+      const maleHints = /(ardi|andika|bagus|budi|male|pria|laki|man|boy)/i;
+      const femaleHints = /(gadis|damayanti|siti|putri|female|wanita|perempuan|woman)/i;
+
+      let chosen = idVoices.find((v) => maleHints.test(v.name));
+      if (chosen) {
+        state.speech.voiceObj = chosen;
+        state.speech.isNativeMale = true;
+      } else {
+        // Jika tidak ada label pria eksplisit, pilih suara Indonesia non-wanita terlebih dahulu, lalu fallback ke suara Indonesia pertama
+        chosen = idVoices.find((v) => !femaleHints.test(v.name)) || idVoices[0] || null;
+        state.speech.voiceObj = chosen;
+        state.speech.isNativeMale = false;
+      }
+
+      updateVoiceBarUI();
+    }
+
+    function initSpeechVoices() {
+      if (!state.speech.supported) {
+        updateVoiceBarUI();
+        return;
+      }
+      pickYoungMaleIndonesianVoice();
+      if (typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
+        window.speechSynthesis.onvoiceschanged = pickYoungMaleIndonesianVoice;
+      }
+    }
+
+    function speakText(text, label = '') {
+      if (!state.speech.supported || !text) return;
+      try {
+        window.speechSynthesis.cancel();
+
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'id-ID';
+
+        if (!state.speech.voiceObj) {
+          pickYoungMaleIndonesianVoice();
+        }
+        if (state.speech.voiceObj) {
+          utter.voice = state.speech.voiceObj;
+        }
+
+        // Karakter suara pria muda: artikulasi tegas, tempo segar & natural
+        if (state.speech.isNativeMale) {
+          utter.pitch = 1.02;
+          utter.rate = 1.02;
+        } else {
+          // Penyesuaian nada agar terdengar seperti pria muda saat browser hanya menyediakan suara standar
+          utter.pitch = 0.84;
+          utter.rate = 1.01;
+        }
+        utter.volume = 1.0;
+
+        utter.onstart = () => {
+          state.speech.isSpeaking = true;
+          state.speech.isPaused = false;
+          updateVoiceBarUI(label || `Sedang membacakan Halaman ${state.currentPage}...`);
+        };
+
+        utter.onpause = () => {
+          state.speech.isPaused = true;
+          updateVoiceBarUI('Narasi dijeda');
+        };
+
+        utter.onresume = () => {
+          state.speech.isPaused = false;
+          updateVoiceBarUI(label || `Melanjutkan Halaman ${state.currentPage}...`);
+        };
+
+        utter.onend = () => {
+          state.speech.isSpeaking = false;
+          state.speech.isPaused = false;
+          updateVoiceBarUI('Selesai membacakan materi');
+        };
+
+        utter.onerror = () => {
+          state.speech.isSpeaking = false;
+          state.speech.isPaused = false;
+          updateVoiceBarUI('Siap membacakan materi halaman ini');
+        };
+
+        window.speechSynthesis.speak(utter);
+      } catch (err) {
+        console.warn('Voice speech tidak dapat dijalankan:', err);
+      }
+    }
+
+    function speakCurrentPage(isAuto = false) {
+      if (!state.speech.supported) return;
+      if (isAuto && (!state.speech.autoPlay || state.rightTab !== 'materi')) return;
+
+      const script = PAGE_NARRATIONS[state.currentPage] || PAGE_NARRATIONS[0];
+      const pageLabel = state.currentPage === 0
+        ? 'Membacakan Sampul Buku...'
+        : `Membacakan Materi Halaman ${state.currentPage}...`;
+      speakText(script, pageLabel);
+    }
+
+    function speakGateDetail(gateKey) {
+      const info = GATE_INFO[gateKey];
+      if (!info) return;
+      const script = `${info.name}, termasuk kategori ${info.category}. ${info.rule} Sebagai analogi, ${info.analogy}`;
+      speakText(script, `Membacakan ${info.name}...`);
+    }
+
+    function togglePlayPauseSpeech() {
+      if (!state.speech.supported) return;
+      if (state.speech.isSpeaking && !state.speech.isPaused) {
+        window.speechSynthesis.pause();
+        state.speech.isPaused = true;
+        updateVoiceBarUI('Narasi dijeda');
+      } else if (state.speech.isSpeaking && state.speech.isPaused) {
+        window.speechSynthesis.resume();
+        state.speech.isPaused = false;
+        updateVoiceBarUI(`Melanjutkan Halaman ${state.currentPage}...`);
+      } else {
+        speakCurrentPage(false);
+      }
+    }
+
+    function stopSpeech() {
+      if (!state.speech.supported) return;
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+      state.speech.isSpeaking = false;
+      state.speech.isPaused = false;
+      updateVoiceBarUI('Siap membacakan materi halaman ini');
+    }
+
+    function toggleAutoSpeech() {
+      state.speech.autoPlay = !state.speech.autoPlay;
+      playSwitchSound(state.speech.autoPlay);
+      updateVoiceBarUI();
+      if (state.speech.autoPlay && !state.speech.isSpeaking && state.rightTab === 'materi') {
+        speakCurrentPage(true);
+      }
+    }
+
+    function updateVoiceBarUI(customStatus = null) {
+      const bars = document.getElementById('voice-bars');
+      const statusEl = document.getElementById('voice-status-text');
+      const playIcon = document.getElementById('voice-play-icon');
+      const playLabel = document.getElementById('voice-play-label');
+      const autoBtn = document.getElementById('btn-voice-auto');
+      const autoDot = document.getElementById('voice-auto-dot');
+      const autoLabel = document.getElementById('voice-auto-label');
+
+      if (!state.speech.supported) {
+        if (statusEl) statusEl.textContent = 'Browser ini belum mendukung fitur Voice Speech';
+        return;
+      }
+
+      const activeTalking = state.speech.isSpeaking && !state.speech.isPaused;
+      if (bars) {
+        bars.classList.toggle('voice-bars-idle', !activeTalking);
+      }
+
+      if (playIcon && playLabel) {
+        if (activeTalking) {
+          playIcon.textContent = '⏸';
+          playLabel.textContent = 'Jeda Narasi';
+        } else if (state.speech.isPaused) {
+          playIcon.textContent = '▶';
+          playLabel.textContent = 'Lanjutkan';
+        } else {
+          playIcon.textContent = '▶';
+          playLabel.textContent = 'Bacakan Halaman';
+        }
+      }
+
+      if (autoBtn && autoDot && autoLabel) {
+        if (state.speech.autoPlay) {
+          autoBtn.className = 'flex-none px-2.5 py-1 rounded-lg text-[10px] font-bold border transition flex items-center gap-1 bg-emerald-500/20 border-emerald-400/50 text-emerald-200';
+          autoDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+          autoLabel.textContent = 'Otomatis: Aktif';
+        } else {
+          autoBtn.className = 'flex-none px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition flex items-center gap-1 bg-slate-800/80 border-slate-600/70 text-slate-300';
+          autoDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-400';
+          autoLabel.textContent = 'Otomatis: Manual';
+        }
+      }
+
+      if (statusEl && customStatus !== null) {
+        statusEl.textContent = customStatus;
+      } else if (statusEl && !state.speech.isSpeaking) {
+        const pageName = state.currentPage === 0 ? 'Sampul Buku' : `Halaman ${state.currentPage}`;
+        statusEl.textContent = `Siap membacakan materi ${pageName}`;
+      }
+    }
+
+    // =========================================================================
+    // 3. NAVIGASI HALAMAN CINEMATIC 3D POP-UP (BUKA, TUTUP, BALIK HALAMAN)
+    // =========================================================================
+
+    function updateNavigationUI(pageIdx) {
+      const pageTitles = [
+        'Sampul (0 / 4)',
+        'Hal. 1 / 4 — Peta Konsep',
+        'Hal. 2 / 4 — AND, OR, NOT',
+        'Hal. 3 / 4 — NAND, NOR',
+        'Hal. 4 / 4 — XOR, XNOR',
+      ];
+      document.getElementById('page-indicator').textContent = pageTitles[pageIdx];
+      document.getElementById('btn-prev').disabled = pageIdx === 0;
+      document.getElementById('btn-next').disabled = pageIdx === 4;
+
+      document.querySelectorAll('.chapter-pill').forEach((btn) => {
+        const bp = Number(btn.dataset.page);
+        if (bp === pageIdx) {
+          btn.className = 'chapter-pill px-3 py-1.5 rounded-lg text-xs font-bold bg-brass text-[#0f242c] shadow transition';
+        } else {
+          btn.className = 'chapter-pill px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#182930] text-teal-100/80 hover:bg-[#233c46] transition';
+        }
+      });
+    }
+
+    function goToPage(targetPage) {
+      const clamped = Math.max(0, Math.min(4, targetPage));
+      if (clamped === state.currentPage || state.isTransitioning) return;
+
+      // Hentikan narasi halaman sebelumnya dengan bersih sebelum transisi
+      stopSpeech();
+
+      const fromPage = state.currentPage;
+      state.isTransitioning = true;
+
+      const assembly = document.getElementById('book-assembly');
+      const frontCover = document.getElementById('hardcover-front');
+      const coverCta = document.getElementById('cover-cta-wrap');
+      const popupStage = document.getElementById('popup-stage');
+      const turningStage = document.getElementById('turning-leaf-stage');
+
+      // ----- KASUS 1: MEMBUKA BUKU DARI SAMPUL (0 -> 1..4) -----
+      if (fromPage === 0 && clamped > 0) {
+        state.currentPage = clamped;
+        state.renderedSpread = clamped;
+        updateNavigationUI(clamped);
+        renderRightPanel();
+        playPageFlipSound();
+
+        // Pasang ilustrasi halaman tujuan dalam kondisi datar terlipat sebelum sampul terbuka
+        setSpreadArtworks(clamped, clamped);
+        updatePopupLayerContent(false);
+        if (coverCta) {
+          coverCta.style.opacity = '0';
+          coverCta.classList.add('pointer-events-none');
+        }
+
+        // Mulai animasi sampul terbuka perlahan + buku bergeser mulus ke posisi terbuka
+        requestAnimationFrame(() => {
+          if (assembly) assembly.classList.remove('is-closed');
+          if (frontCover) frontCover.classList.add('is-open');
+        });
+
+        // Setelah halaman terbuka, elemen 3D Pop-Up mulai muncul & berdiri bertahap
+        setTimeout(() => {
+          if (popupStage) {
+            popupStage.classList.remove('is-folded');
+            popupStage.classList.add('is-unfolded');
+          }
+          playSwitchSound(true);
+          // Mulai narasi otomatis saat halaman selesai terbuka
+          speakCurrentPage(true);
+        }, 820);
+
+        setTimeout(() => {
+          state.isTransitioning = false;
+        }, 1520);
+        return;
+      }
+
+      // ----- KASUS 2: MENUTUP BUKU KEMBALI KE SAMPUL (1..4 -> 0) -----
+      if (fromPage > 0 && clamped === 0) {
+        // Fase 1: Lipat perlahan semua objek 3D Pop-Up kembali ke permukaan kertas
+        if (popupStage) {
+          popupStage.classList.remove('is-unfolded');
+          popupStage.classList.add('is-folded');
+        }
+        playSwitchSound(false);
+
+        // Fase 2: Setelah pop-up benar-benar terlipat, tutup sampul hardcover perlahan
+        setTimeout(() => {
+          state.currentPage = 0;
+          updateNavigationUI(0);
+          renderRightPanel();
+          playPageFlipSound();
+
+          if (frontCover) frontCover.classList.remove('is-open');
+          if (assembly) assembly.classList.add('is-closed');
+        }, 540);
+
+        setTimeout(() => {
+          if (coverCta) {
+            coverCta.style.opacity = '1';
+            coverCta.classList.remove('pointer-events-none');
+          }
+          state.isTransitioning = false;
+          updateVoiceBarUI();
+        }, 1620);
+        return;
+      }
+
+      // ----- KASUS 3: PERGANTIAN HALAMAN (1..4 <-> 1..4) -----
+      const isNext = clamped > fromPage;
+
+      // Fase 1: Lipat objek 3D Pop-Up halaman saat ini kembali datar ke permukaan kertas
+      if (popupStage) {
+        popupStage.classList.remove('is-unfolded');
+        popupStage.classList.add('is-folded');
+      }
+      playSwitchSound(false);
+
+      // Fase 2: Angkat & balik lembaran kertas dua sisi dengan lengkungan + bayangan dinamis
+      setTimeout(() => {
+        playPageFlipSound();
+
+        // Di bawah lembaran yang dibalik, sisi yang terungkap sudah menampilkan halaman tujuan
+        if (isNext) {
+          setSpreadArtworks(fromPage, clamped);
+        } else {
+          setSpreadArtworks(clamped, fromPage);
+        }
+
+        // Bangun lembaran kertas dua sisi yang melengkung saat berputar
+        if (turningStage) {
+          const frontImg = isNext ? GITHUB_IMAGES[fromPage] : GITHUB_IMAGES[fromPage];
+          const backImg = isNext ? GITHUB_IMAGES[clamped] : GITHUB_IMAGES[clamped];
+          const frontPos = isNext ? '-left-full' : 'left-0';
+          const backPos = isNext ? 'left-0' : '-left-full';
+
+          turningStage.innerHTML = `
+            <div class="turning-cast-shadow ${isNext ? 'shadow-next' : 'shadow-prev'}"></div>
+            <div class="turning-leaf ${isNext ? 'turn-next' : 'turn-prev'}">
+              <div class="leaf-face leaf-face-front">
+                <img src="${frontImg}" alt="Halaman dibalik" class="absolute top-0 ${frontPos} w-[200%] h-full max-w-none object-cover select-none pointer-events-none" />
+                <div class="paper-matte-overlay"></div>
+                <div class="${isNext ? 'spine-ao-right' : 'spine-ao-left'}"></div>
+                <div class="leaf-curl-sheen"></div>
+              </div>
+              <div class="leaf-face leaf-face-back">
+                <img src="${backImg}" alt="Halaman baru" class="absolute top-0 ${backPos} w-[200%] h-full max-w-none object-cover select-none pointer-events-none" />
+                <div class="paper-matte-overlay"></div>
+                <div class="${isNext ? 'spine-ao-left' : 'spine-ao-right'}"></div>
+                <div class="leaf-curl-sheen"></div>
+              </div>
+            </div>
+          `;
+        }
+      }, 520);
+
+      // Fase 3: Setelah lembaran mendarat lembut, pasang halaman baru & munculkan Pop-Up 3D bertahap
+      setTimeout(() => {
+        state.currentPage = clamped;
+        state.renderedSpread = clamped;
+        setSpreadArtworks(clamped, clamped);
+        if (turningStage) turningStage.innerHTML = '';
+
+        updateNavigationUI(clamped);
+        renderRightPanel();
+        updatePopupLayerContent(false);
+
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (popupStage) {
+              popupStage.classList.remove('is-folded');
+              popupStage.classList.add('is-unfolded');
+            }
+            playSwitchSound(true);
+            // Mulai narasi otomatis untuk halaman baru yang dipilih
+            speakCurrentPage(true);
+          }, 40);
+        });
+      }, 1440);
+
+      setTimeout(() => {
+        state.isTransitioning = false;
+      }, 2120);
+    }
+
+    function nextPage() {
+      goToPage(state.currentPage + 1);
+    }
+
+    function prevPage() {
+      goToPage(state.currentPage - 1);
+    }
+
+    function selectOverviewGate(gateName) {
+      if (!GATE_INFO[gateName]) return;
+      state.inputs.selectedOverviewGate = gateName;
+      playSwitchSound(true);
+      updatePopupLayerContent(true);
+      renderRightPanel();
+    }
+
+    function toggleInput(key) {
+      if (!(key in state.inputs)) return;
+      state.inputs[key] = state.inputs[key] ? 0 : 1;
+      playSwitchSound(Boolean(state.inputs[key]));
+      updatePopupLayerContent(true);
+      renderRightPanel();
+    }
+
+    function setRightTab(tab) {
+      state.rightTab = tab;
+      const tabMateri = document.getElementById('tab-materi');
+      const tabKuis = document.getElementById('tab-kuis');
+
+      if (tab === 'materi') {
+        tabMateri.className = 'flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold bg-brass text-[#0d2229] shadow transition flex items-center justify-center gap-1.5';
+        tabKuis.className = 'flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-teal-200 hover:bg-teal-900/50 transition flex items-center justify-center gap-1.5';
+      } else {
+        stopSpeech();
+        tabKuis.className = 'flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold bg-brass text-[#0d2229] shadow transition flex items-center justify-center gap-1.5';
+        tabMateri.className = 'flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-teal-200 hover:bg-teal-900/50 transition flex items-center justify-center gap-1.5';
+      }
+
+      playSwitchSound(true);
+      renderRightPanel();
+    }
+
+    // =========================================================================
+    // 4. KONTROL KAMERA 3D & DRAG GESTURE (FIXED CINEMATIC CAMERA)
+    // =========================================================================
+
+    function setCameraPreset(preset) {
+      state.camera.preset = preset;
+      if (preset === 'iso') {
+        state.camera.rotX = 16;
+        state.camera.rotY = 0;
+      } else if (preset === 'front') {
+        state.camera.rotX = 0;
+        state.camera.rotY = 0;
+      } else if (preset === 'top') {
+        state.camera.rotX = 34;
+        state.camera.rotY = 0;
+      }
+
+      ['iso', 'front', 'top'].forEach((id) => {
+        const el = document.getElementById(`cam-${id}`);
+        if (!el) return;
+        el.className =
+          id === preset
+            ? 'px-2.5 py-1 rounded-md bg-brass text-[#102930] font-semibold transition'
+            : 'px-2.5 py-1 rounded-md text-teal-100 hover:bg-teal-900/60 transition';
+      });
+
+      updateBookTransform();
+    }
+
+    function updateBookTransform() {
+      const rig = document.getElementById('book-rig');
+      if (!rig) return;
+      // Kamera tetap stabil & konsisten di seluruh transisi (tanpa lonjakan perspektif)
+      rig.style.transform = `rotateX(${state.camera.rotX}deg) rotateY(${state.camera.rotY}deg)`;
+    }
+
+    function setupDragCamera() {
+      const stage = document.getElementById('stage-3d');
+      const rig = document.getElementById('book-rig');
+      if (!stage || !rig) return;
+
+      let dragging = false;
+      let startX = 0;
+      let startY = 0;
+      let baseRotX = 0;
+      let baseRotY = 0;
+
+      const onStart = (clientX, clientY, target) => {
+        if (target && target.closest('button')) return;
+        dragging = true;
+        startX = clientX;
+        startY = clientY;
+        baseRotX = state.camera.rotX;
+        baseRotY = state.camera.rotY;
+        rig.classList.add('dragging');
+      };
+
+      const onMove = (clientX, clientY) => {
+        if (!dragging) return;
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+        state.camera.rotY = Math.max(-32, Math.min(32, baseRotY + dx * 0.22));
+        state.camera.rotX = Math.max(0, Math.min(48, baseRotX - dy * 0.22));
+        updateBookTransform();
+      };
+
+      const onEnd = () => {
+        if (!dragging) return;
+        dragging = false;
+        rig.classList.remove('dragging');
+      };
+
+      // Mouse events
+      stage.addEventListener('mousedown', (e) => onStart(e.clientX, e.clientY, e.target));
+      window.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
+      window.addEventListener('mouseup', onEnd);
+
+      // Touch events
+      stage.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          onStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+        }
+      }, { passive: true });
+      stage.addEventListener('touchmove', (e) => {
+        if (dragging && e.touches.length === 1) {
+          onMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
+      stage.addEventListener('touchend', onEnd);
+      stage.addEventListener('touchcancel', onEnd);
+    }
+
+    // =========================================================================
+    // 5. RENDER BUKU POP-UP 3D PAPER CRAFT CINEMATIC (UNIFIED PHYSICAL BOOK)
+    // =========================================================================
+
+    function initPhysicalBookDOM() {
+      const rig = document.getElementById('book-rig');
+      if (!rig) return;
+
+      const isClosed = state.currentPage === 0;
+      const spreadIdx = state.currentPage === 0 ? 1 : state.currentPage;
+      state.renderedSpread = spreadIdx;
+
+      rig.innerHTML = `
+        <div class="flex flex-col items-center">
+          <div id="book-assembly" class="book-assembly ${isClosed ? 'is-closed' : ''}">
+            <!-- Bayangan meja & struktur hardcover belakang -->
+            <div class="book-desk-shadow"></div>
+            <div class="hardcover-back-left"></div>
+            <div class="hardcover-back-right"></div>
+            <div class="book-spine"></div>
+
+            <!-- Tumpukan kertas kiri (menampilkan belahan kiri halaman aktif) -->
+            <div class="paper-block-left">
+              <div class="page-surface page-surface-left">
+                <img id="page-img-left" src="${GITHUB_IMAGES[spreadIdx]}" alt="Halaman Kiri"
+                  class="absolute top-0 left-0 w-[200%] h-full max-w-none object-cover select-none pointer-events-none"
+                  onerror="this.onerror=null;this.src='https://placehold.co/780x440/2b2118/f0d593?text=GERBANG+LOGIKA';" />
+                <div class="paper-matte-overlay"></div>
+                <div class="spine-ao-left"></div>
+              </div>
+            </div>
+
+            <!-- Tumpukan kertas kanan (menampilkan belahan kanan halaman aktif) -->
+            <div class="paper-block-right">
+              <div class="page-surface page-surface-right">
+                <img id="page-img-right" src="${GITHUB_IMAGES[spreadIdx]}" alt="Halaman Kanan"
+                  class="absolute top-0 -left-full w-[200%] h-full max-w-none object-cover select-none pointer-events-none"
+                  onerror="this.onerror=null;this.src='https://placehold.co/780x440/2b2118/f0d593?text=GERBANG+LOGIKA';" />
+                <div class="paper-matte-overlay"></div>
+                <div class="spine-ao-right"></div>
+              </div>
+            </div>
+
+            <!-- Panggung Elemen Pop-Up 3D Berlapis (Melipat & Berdiri dari Permukaan Kertas) -->
+            <div id="popup-stage" class="popup-stage ${isClosed ? 'is-folded' : 'is-unfolded'}"></div>
+
+            <!-- Panggung Lembaran Kertas Dua Sisi yang Sedang Dibalik -->
+            <div id="turning-leaf-stage" class="turning-leaf-stage"></div>
+
+            <!-- Sampul Depan Hardcover Berengsel (Terbuka & Tertutup Secara Realistis) -->
+            <div id="hardcover-front" class="hardcover-front ${isClosed ? '' : 'is-open'}" onclick="if(state.currentPage === 0) goToPage(1)" title="Klik untuk membuka buku">
+              <div class="cover-face cover-face-front">
+                <img
+                  src="${GITHUB_IMAGES[0]}"
+                  alt="Cover Gerbang Logika"
+                  class="w-full h-full object-cover object-[51%_47.5%] scale-[1.26] select-none pointer-events-none"
+                  onerror="this.onerror=null;this.src='https://placehold.co/390x440/124e5d/f0d593?text=COVER+GERBANG+LOGIKA';"
+                />
+                <div class="absolute inset-y-0 left-0 w-7 bg-gradient-to-r from-black/40 via-black/10 to-transparent pointer-events-none"></div>
+              </div>
+              <div class="cover-face cover-face-inside">
+                <div class="w-full h-full flex flex-col items-center justify-center p-6 text-center opacity-75">
+                  <div class="w-12 h-12 rounded-full border-2 border-[#124e5d]/40 flex items-center justify-center font-display font-bold text-[#124e5d] text-base mb-2">GL</div>
+                  <p class="font-display text-xs tracking-widest text-[#124e5d] uppercase">Buku Pop-Up 3D</p>
+                  <p class="text-[10px] text-[#4a3723] mt-1">Gerbang Logika &amp; Tabel Kebenaran</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tombol Buka Buku halus di bawah sampul saat tertutup -->
+          <div id="cover-cta-wrap" class="mt-6 transition-opacity duration-500 ${isClosed ? 'opacity-100' : 'opacity-0 pointer-events-none'}">
+            <button onclick="goToPage(1)" class="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-brass to-amber-500 hover:from-amber-400 hover:to-brass text-[#0d2c35] font-bold text-xs shadow-xl border border-amber-200/70 transition cursor-pointer">
+              <span>📖</span> Buka Buku Pop-Up 3D <span>➔</span>
+            </button>
+          </div>
+        </div>
+      `;
+
+      updateNavigationUI(state.currentPage);
+      updatePopupLayerContent(!isClosed);
+      updateBookTransform();
+    }
+
+    function setSpreadArtworks(leftPageIdx, rightPageIdx) {
+      const leftImg = document.getElementById('page-img-left');
+      const rightImg = document.getElementById('page-img-right');
+      if (leftImg && GITHUB_IMAGES[leftPageIdx]) leftImg.src = GITHUB_IMAGES[leftPageIdx];
+      if (rightImg && GITHUB_IMAGES[rightPageIdx]) rightImg.src = GITHUB_IMAGES[rightPageIdx];
+    }
+
+    function updatePopupLayerContent(keepUnfolded = true) {
+      const popupStage = document.getElementById('popup-stage');
+      if (!popupStage) return;
+
+      const p = state.renderedSpread;
+      let content = '<div class="popup-ground-shadow"></div>';
+
+      if (state.showBookControls) {
+        if (p === 1) content += buildSpread1_Overview();
+        if (p === 2) content += buildSpread2_AndOrNot();
+        if (p === 3) content += buildSpread3_NandNor();
+        if (p === 4) content += buildSpread4_XorXnor();
+      }
+
+      popupStage.innerHTML = content;
+
+      if (keepUnfolded && state.currentPage > 0) {
+        popupStage.classList.remove('is-folded');
+        popupStage.classList.add('is-unfolded');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // SPREAD 1: LAYERED 3D PAPER CUTOUT — "gerbang logik & tabel kebenaran.jfif"
+    // -------------------------------------------------------------------------
+    function buildSpread1_Overview() {
+      const sel = state.inputs.selectedOverviewGate;
+      const pins = [
+        { g: 'AND',  pos: 'left-[22%] top-[41%]' },
+        { g: 'OR',   pos: 'left-[22%] top-[55%]' },
+        { g: 'NOT',  pos: 'left-[21%] top-[70%]' },
+        { g: 'XOR',  pos: 'left-[48%] top-[39%]' },
+        { g: 'XNOR', pos: 'left-[48%] top-[60%]' },
+        { g: 'NAND', pos: 'left-[74%] top-[41%]' },
+        { g: 'NOR',  pos: 'left-[74%] top-[57%]' },
+      ];
+
+      return `
+        <!-- Tier 1: Papan Judul Paper Cutout Timbul -->
+        <div class="popup-tier popup-tier-1 absolute top-3 inset-x-0 flex justify-center pointer-events-none">
+          <div class="papercraft-banner rounded-lg px-5 py-1 text-center">
+            <span class="font-display font-extrabold text-xs tracking-wider uppercase">Peta Konsep 7 Gerbang Logika</span>
+          </div>
+        </div>
+
+        <!-- Tier 2: Pin Paper-Craft 7 Gerbang Logika -->
+        <div class="popup-tier popup-tier-2 absolute inset-0 pointer-events-none">
+          ${pins.map(({ g, pos }) => `
+            <button onclick="event.stopPropagation(); selectOverviewGate('${g}')"
+              class="papercraft-card pointer-events-auto absolute ${pos} -translate-x-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full font-mono text-[11px] font-bold transition cursor-pointer ${
+                sel === g
+                  ? 'bg-amber-400 text-[#231404] scale-110'
+                  : 'bg-[#0f242c]/92 text-amber-100 hover:bg-brass hover:text-[#0f242c]'
+              }">
+              ${g}
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- Tier 3: Panel Informasi Lipatan Depan -->
+        <div class="popup-tier popup-tier-3 absolute bottom-3 inset-x-0 flex justify-center pointer-events-none">
+          <div class="papercraft-card pointer-events-auto bg-[#0d2229]/95 rounded-full px-4 py-1.5 text-[11px] text-amber-100 flex items-center gap-2 whitespace-nowrap">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span>Terpilih: <strong class="text-amber-300">${GATE_INFO[sel].name}</strong> (${GATE_INFO[sel].formula}) — Klik gerbang pada buku!</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // SPREAD 2: LAYERED 3D PAPER CUTOUT — "tabel kebenaran and,or,not.jfif"
+    // -------------------------------------------------------------------------
+    function buildSpread2_AndOrNot() {
+      const { andA, andB, orA, orB, notA } = state.inputs;
+      const andOut = calcGate('AND', andA, andB);
+      const orOut = calcGate('OR', orA, orB);
+      const notOut = calcGate('NOT', notA, 0);
+
+      const btn = (label, key, val) => `
+        <button onclick="event.stopPropagation(); toggleInput('${key}')"
+          class="mech-switch px-2 py-1 rounded-md font-mono text-[11px] font-bold border transition ${
+            val
+              ? 'bg-amber-400 border-amber-200 text-slate-950'
+              : 'bg-slate-800/90 border-slate-500 text-slate-200'
+          }">
+          ${label}=${val}
+        </button>
+      `;
+
+      return `
+        <div class="popup-tier popup-tier-1 absolute top-3 inset-x-0 flex justify-center pointer-events-none">
+          <div class="papercraft-banner rounded-lg px-5 py-1 text-center">
+            <span class="font-display font-extrabold text-xs tracking-wider uppercase">Gerbang Dasar: AND &bull; OR &bull; NOT</span>
+          </div>
+        </div>
+
+        <div class="popup-tier popup-tier-3 absolute bottom-3 inset-x-4 grid grid-cols-3 gap-3 pointer-events-auto">
+          <div class="papercraft-card bg-[#2b2016]/95 rounded-xl px-2.5 py-2 flex items-center justify-between gap-1.5">
+            <span class="font-display font-bold text-xs text-amber-300">AND</span>
+            <div class="flex items-center gap-1">
+              ${btn('A', 'andA', andA)}
+              ${btn('B', 'andB', andB)}
+            </div>
+            <span class="px-2 py-1 rounded-md font-mono text-[11px] font-black ${
+              andOut ? 'bg-emerald-400 text-slate-950 shadow-[0_0_10px_#34d399]' : 'bg-slate-900 text-slate-400'
+            }">Y=${andOut}</span>
+          </div>
+
+          <div class="papercraft-card bg-[#2b2016]/95 rounded-xl px-2.5 py-2 flex items-center justify-between gap-1.5">
+            <span class="font-display font-bold text-xs text-emerald-300">OR</span>
+            <div class="flex items-center gap-1">
+              ${btn('A', 'orA', orA)}
+              ${btn('B', 'orB', orB)}
+            </div>
+            <span class="px-2 py-1 rounded-md font-mono text-[11px] font-black ${
+              orOut ? 'bg-emerald-400 text-slate-950 shadow-[0_0_10px_#34d399]' : 'bg-slate-900 text-slate-400'
+            }">Y=${orOut}</span>
+          </div>
+
+          <div class="papercraft-card bg-[#2b2016]/95 rounded-xl px-2.5 py-2 flex items-center justify-between gap-1.5">
+            <span class="font-display font-bold text-xs text-rose-300">NOT</span>
+            <div class="flex items-center gap-1">
+              ${btn('A', 'notA', notA)}
+            </div>
+            <span class="px-2 py-1 rounded-md font-mono text-[11px] font-black ${
+              notOut ? 'bg-emerald-400 text-slate-950 shadow-[0_0_10px_#34d399]' : 'bg-slate-900 text-slate-400'
+            }">Y=${notOut}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // SPREAD 3: LAYERED 3D PAPER CUTOUT — "tabel kebenaran nand,nor.jfif"
+    // -------------------------------------------------------------------------
+    function buildSpread3_NandNor() {
+      const { nandA, nandB, norA, norB } = state.inputs;
+      const nandOut = calcGate('NAND', nandA, nandB);
+      const norOut = calcGate('NOR', norA, norB);
+
+      const btn = (label, key, val) => `
+        <button onclick="event.stopPropagation(); toggleInput('${key}')"
+          class="mech-switch px-2.5 py-1 rounded-md font-mono text-xs font-bold border transition ${
+            val
+              ? 'bg-amber-400 border-amber-200 text-slate-950'
+              : 'bg-slate-800/90 border-slate-500 text-slate-200'
+          }">
+          ${label} = ${val}
+        </button>
+      `;
+
+      return `
+        <div class="popup-tier popup-tier-1 absolute top-3 inset-x-0 flex justify-center pointer-events-none">
+          <div class="papercraft-banner rounded-lg px-5 py-1 text-center">
+            <span class="font-display font-extrabold text-xs tracking-wider uppercase">Gerbang Universal: NAND &amp; NOR</span>
+          </div>
+        </div>
+
+        <div class="popup-tier popup-tier-3 absolute bottom-3 inset-x-8 grid grid-cols-2 gap-8 pointer-events-auto">
+          <div class="papercraft-card bg-[#163a52]/95 rounded-xl px-3.5 py-2 flex items-center justify-between gap-2">
+            <span class="font-display font-bold text-xs text-sky-200">NAND</span>
+            <div class="flex items-center gap-1.5">
+              ${btn('A', 'nandA', nandA)}
+              ${btn('B', 'nandB', nandB)}
+            </div>
+            <span class="px-2.5 py-1 rounded-md font-mono text-xs font-black ${
+              nandOut ? 'bg-emerald-400 text-slate-950 shadow-[0_0_12px_#34d399]' : 'bg-slate-900 text-slate-400'
+            }">Y = ${nandOut}</span>
+          </div>
+
+          <div class="papercraft-card bg-[#23471f]/95 rounded-xl px-3.5 py-2 flex items-center justify-between gap-2">
+            <span class="font-display font-bold text-xs text-emerald-200">NOR</span>
+            <div class="flex items-center gap-1.5">
+              ${btn('A', 'norA', norA)}
+              ${btn('B', 'norB', norB)}
+            </div>
+            <span class="px-2.5 py-1 rounded-md font-mono text-xs font-black ${
+              norOut ? 'bg-emerald-400 text-slate-950 shadow-[0_0_12px_#34d399]' : 'bg-slate-900 text-slate-400'
+            }">Y = ${norOut}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // SPREAD 4: LAYERED 3D PAPER CUTOUT — "tabel kebenaran xor,xnor.jfif"
+    // -------------------------------------------------------------------------
+    function buildSpread4_XorXnor() {
+      const { xorA, xorB, xnorA, xnorB } = state.inputs;
+      const xorOut = calcGate('XOR', xorA, xorB);
+      const xnorOut = calcGate('XNOR', xnorA, xnorB);
+
+      const btn = (label, key, val) => `
+        <button onclick="event.stopPropagation(); toggleInput('${key}')"
+          class="mech-switch px-2.5 py-1 rounded-md font-mono text-xs font-bold border transition ${
+            val
+              ? 'bg-amber-400 border-amber-200 text-slate-950'
+              : 'bg-slate-800/90 border-slate-500 text-slate-200'
+          }">
+          ${label} = ${val}
+        </button>
+      `;
+
+      return `
+        <div class="popup-tier popup-tier-1 absolute top-3 inset-x-0 flex justify-center pointer-events-none">
+          <div class="papercraft-banner rounded-lg px-5 py-1 text-center">
+            <span class="font-display font-extrabold text-xs tracking-wider uppercase">Gerbang Khusus: XOR &amp; XNOR</span>
+          </div>
+        </div>
+
+        <div class="popup-tier popup-tier-3 absolute bottom-3 inset-x-8 grid grid-cols-2 gap-8 pointer-events-auto">
+          <div class="papercraft-card bg-[#1a3347]/95 rounded-xl px-3.5 py-2 flex items-center justify-between gap-2">
+            <span class="font-display font-bold text-xs text-orange-300">XOR</span>
+            <div class="flex items-center gap-1.5">
+              ${btn('A', 'xorA', xorA)}
+              ${btn('B', 'xorB', xorB)}
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full ${xorOut ? 'bg-orange-400 shadow-[0_0_10px_#fb923c]' : 'bg-slate-600'}"></span>
+              <span class="font-mono text-xs font-black text-white">Y = ${xorOut}</span>
+            </div>
+          </div>
+
+          <div class="papercraft-card bg-[#5c1919]/95 rounded-xl px-3.5 py-2 flex items-center justify-between gap-2">
+            <span class="font-display font-bold text-xs text-emerald-200">XNOR</span>
+            <div class="flex items-center gap-1.5">
+              ${btn('A', 'xnorA', xnorA)}
+              ${btn('B', 'xnorB', xnorB)}
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full ${xnorOut ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]' : 'bg-red-950 border border-red-400/50'}"></span>
+              <span class="font-mono text-xs font-black text-white">Y = ${xnorOut}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 6. RENDER PANEL PENJELASAN POSISI KANAN & KUIS INTERAKTIF
+    // =========================================================================
+
+    function buildTruthTableHTML(gateKey, activeA = null, activeB = null) {
+      const info = GATE_INFO[gateKey];
+      if (info.unary) {
+        const rows = [0, 1];
+        return `
+          <table class="w-full text-center font-mono text-xs rounded-lg overflow-hidden border border-teal-800/80">
+            <thead class="bg-[#09181f] text-brassLight">
+              <tr>
+                <th class="py-1.5 border-b border-teal-800/80">Input A</th>
+                <th class="py-1.5 border-b border-teal-800/80">Output Y</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((a) => {
+                const y = calcGate('NOT', a, 0);
+                const isActive = activeA === a;
+                return `
+                  <tr class="${isActive ? 'bg-amber-400/20 text-amber-200 font-bold' : 'bg-[#0d2028]/70 text-teal-100/90'} border-b border-teal-900/60">
+                    <td class="py-1.5">${a}</td>
+                    <td class="py-1.5 ${y ? 'text-emerald-300 font-bold' : 'text-slate-400'}">${y}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      const combos = [
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1],
+      ];
+
+      return `
+        <table class="w-full text-center font-mono text-xs rounded-lg overflow-hidden border border-teal-800/80">
+          <thead class="bg-[#09181f] text-brassLight">
+            <tr>
+              <th class="py-1.5 border-b border-teal-800/80">A</th>
+              <th class="py-1.5 border-b border-teal-800/80">B</th>
+              <th class="py-1.5 border-b border-teal-800/80">Output Y</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${combos.map(([a, b]) => {
+              const y = calcGate(gateKey, a, b);
+              const isActive = activeA === a && activeB === b;
+              return `
+                <tr class="${isActive ? 'bg-amber-400/20 text-amber-200 font-bold' : 'bg-[#0d2028]/70 text-teal-100/90'} border-b border-teal-900/60">
+                  <td class="py-1.5">${a}</td>
+                  <td class="py-1.5">${b}</td>
+                  <td class="py-1.5 ${y ? 'text-emerald-300 font-bold' : 'text-slate-400'}">${y}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function buildInteractiveGateCard(gateKey, keyA, keyB = null) {
+      const info = GATE_INFO[gateKey];
+      const valA = state.inputs[keyA];
+      const valB = keyB ? state.inputs[keyB] : 0;
+      const out = calcGate(gateKey, valA, valB);
+
+      return `
+        <div class="bg-[#0a1b22] border border-teal-800/80 rounded-2xl p-4 space-y-3 shadow-md">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${info.badge} mb-1">
+                ${info.category}
+              </span>
+              <h3 class="font-display font-bold text-base ${info.color}">${info.name}</h3>
+            </div>
+            <span class="font-mono text-xs px-2.5 py-1 rounded-lg bg-[#132f3a] border border-brass/40 text-brassLight font-bold">
+              ${info.formula}
+            </span>
+          </div>
+
+          <p class="text-xs text-teal-100/90 leading-relaxed">${info.rule}</p>
+
+          <!-- Kontrol Simulasi Sinkron dengan Buku 3D -->
+          <div class="bg-[#112933] rounded-xl p-3 border border-teal-800/70 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <button onclick="toggleInput('${keyA}')"
+                class="px-3 py-1.5 rounded-lg font-mono text-xs font-bold border transition ${
+                  valA ? 'bg-emerald-500 border-emerald-200 text-slate-950' : 'bg-slate-800 border-slate-600 text-slate-200'
+                }">
+                A = ${valA}
+              </button>
+              ${keyB ? `
+                <button onclick="toggleInput('${keyB}')"
+                  class="px-3 py-1.5 rounded-lg font-mono text-xs font-bold border transition ${
+                    valB ? 'bg-emerald-500 border-emerald-200 text-slate-950' : 'bg-slate-800 border-slate-600 text-slate-200'
+                  }">
+                  B = ${valB}
+                </button>
+              ` : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-teal-200/70">Output:</span>
+              <span class="px-3 py-1 rounded-lg font-mono text-xs font-black ${
+                out ? 'bg-amber-400 text-slate-950 shadow-[0_0_12px_rgba(251,191,36,0.65)]' : 'bg-slate-900 text-slate-400 border border-slate-700'
+              }">
+                Y = ${out} (${out ? 'TRUE' : 'FALSE'})
+              </span>
+            </div>
+          </div>
+
+          ${buildTruthTableHTML(gateKey, valA, keyB ? valB : null)}
+
+          <div class="bg-[#0e252e] rounded-xl p-2.5 border-l-2 border-brass text-[11px] text-amber-100/85 leading-relaxed">
+            <strong class="text-brassLight">💡 Analogi:</strong> ${info.analogy}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRightPanel() {
+      const container = document.getElementById('right-panel-content');
+      if (!container) return;
+
+      if (state.rightTab === 'kuis') {
+        renderQuizPanel(container);
+        return;
+      }
+
+      const p = state.currentPage;
+
+      // ---- PANEL HALAMAN 0: SAMPUL ----
+      if (p === 0) {
+        container.innerHTML = `
+          <div class="bg-gradient-to-br from-[#143742] to-[#0a1d24] border border-brass/40 rounded-2xl p-4 space-y-3">
+            <span class="inline-block text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-brass/20 text-brassLight border border-brass/40">
+              Sampul Buku Interaktif
+            </span>
+            <h2 class="font-display font-bold text-xl text-brassLight leading-snug">
+              Selamat Datang di Buku Pop-Up 3D Gerbang Logika
+            </h2>
+            <p class="text-xs text-teal-100/90 leading-relaxed">
+              Media ajar ini membantu siswa memahami <strong>7 Gerbang Logika Digital</strong> dan <strong>Tabel Kebenaran</strong> secara visual, interaktif, dan menyenangkan.
+            </p>
+            <button onclick="goToPage(1)" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brass to-amber-500 hover:from-amber-400 hover:to-brass text-[#112930] font-bold text-xs shadow-lg transition">
+              Mulai Buka Halaman 1 ➔
+            </button>
+          </div>
+
+          <div class="bg-[#0a1b22] border border-teal-800/80 rounded-2xl p-4 space-y-2.5">
+            <h3 class="font-display font-bold text-sm text-brassLight">📚 Daftar Isi Buku</h3>
+            <ul class="space-y-2 text-xs text-teal-100/90">
+              <li class="flex items-center justify-between bg-[#10262f] px-3 py-2 rounded-xl cursor-pointer hover:border-brass/50 border border-transparent transition" onclick="goToPage(1)">
+                <span><strong>Hal. 1</strong> — Peta Konsep 7 Gerbang Logika</span>
+                <span class="text-brassLight">➔</span>
+              </li>
+              <li class="flex items-center justify-between bg-[#10262f] px-3 py-2 rounded-xl cursor-pointer hover:border-brass/50 border border-transparent transition" onclick="goToPage(2)">
+                <span><strong>Hal. 2</strong> — Gerbang Dasar: AND, OR, NOT</span>
+                <span class="text-brassLight">➔</span>
+              </li>
+              <li class="flex items-center justify-between bg-[#10262f] px-3 py-2 rounded-xl cursor-pointer hover:border-brass/50 border border-transparent transition" onclick="goToPage(3)">
+                <span><strong>Hal. 3</strong> — Gerbang Universal: NAND, NOR</span>
+                <span class="text-brassLight">➔</span>
+              </li>
+              <li class="flex items-center justify-between bg-[#10262f] px-3 py-2 rounded-xl cursor-pointer hover:border-brass/50 border border-transparent transition" onclick="goToPage(4)">
+                <span><strong>Hal. 4</strong> — Gerbang Khusus: XOR, XNOR</span>
+                <span class="text-brassLight">➔</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="bg-[#0a1b22] border border-teal-800/80 rounded-2xl p-4 space-y-2 text-xs text-teal-100/85">
+            <h3 class="font-display font-bold text-sm text-brassLight">🧭 Cara Menggunakan</h3>
+            <p>&bull; <strong>Geser (Drag)</strong> area buku di kiri untuk memutar sudut pandang 3D.</p>
+            <p>&bull; <strong>Klik tombol 0/1</strong> pada buku atau di panel kanan untuk melihat perubahan output secara langsung.</p>
+            <p>&bull; Gunakan tombol <strong>Kontrol 3D</strong> di header jika ingin menyembunyikan tombol overlay saat presentasi.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // ---- PANEL HALAMAN 1: PETA KONSEP ----
+      if (p === 1) {
+        const sel = state.inputs.selectedOverviewGate;
+        const info = GATE_INFO[sel];
+        const allGates = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR'];
+
+        container.innerHTML = `
+          <div class="space-y-1">
+            <span class="text-[11px] font-mono text-brassLight uppercase tracking-wider">Halaman 1 &bull; Peta Konsep</span>
+            <h2 class="font-display font-bold text-lg text-white">Gerbang Logika &amp; Tabel Kebenaran</h2>
+            <p class="text-xs text-teal-100/85 leading-relaxed">
+              Gerbang logika adalah blok pembangun dasar sistem digital yang mengolah sinyal biner <strong>0 (FALSE / LOW)</strong> dan <strong>1 (TRUE / HIGH)</strong>.
+            </p>
+          </div>
+
+          <!-- Pemilih cepat 7 gerbang -->
+          <div class="bg-[#0a1b22] border border-teal-800/80 rounded-2xl p-3 space-y-2">
+            <p class="text-[11px] text-teal-200/80 font-semibold">Pilih Gerbang untuk Melihat Detailnya:</p>
+            <div class="flex flex-wrap gap-1.5">
+              ${allGates.map((g) => `
+                <button onclick="selectOverviewGate('${g}')"
+                  class="px-2.5 py-1 rounded-lg font-mono text-xs font-bold transition ${
+                    sel === g
+                      ? 'bg-amber-400 text-slate-950 shadow'
+                      : 'bg-[#132c36] text-teal-100 hover:bg-[#1c3f4d]'
+                  }">
+                  ${g}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Detail Gerbang Terpilih -->
+          <div class="bg-[#0a1b22] border border-brass/40 rounded-2xl p-4 space-y-3">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${info.badge} mb-1">
+                  ${info.category}
+                </span>
+                <h3 class="font-display font-bold text-base ${info.color}">${info.name}</h3>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button onclick="speakGateDetail('${sel}')"
+                  class="px-2 py-1 rounded-lg bg-[#14303b] hover:bg-brass hover:text-[#0d2229] border border-brass/40 text-brassLight text-[11px] font-bold transition"
+                  title="Dengarkan penjelasan ${info.name}">
+                  🔊
+                </button>
+                <span class="font-mono text-xs px-2.5 py-1 rounded-lg bg-[#132f3a] border border-brass/40 text-brassLight font-bold">
+                  ${info.formula}
+                </span>
+              </div>
+            </div>
+            <p class="text-xs text-teal-100/90 leading-relaxed">${info.rule}</p>
+            ${buildTruthTableHTML(sel)}
+            <div class="bg-[#0e252e] rounded-xl p-2.5 border-l-2 border-brass text-[11px] text-amber-100/85">
+              <strong class="text-brassLight">💡 Analogi:</strong> ${info.analogy}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // ---- PANEL HALAMAN 2: AND, OR, NOT ----
+      if (p === 2) {
+        container.innerHTML = `
+          <div class="space-y-1">
+            <span class="text-[11px] font-mono text-brassLight uppercase tracking-wider">Halaman 2 &bull; Gerbang Dasar</span>
+            <h2 class="font-display font-bold text-lg text-white">Tabel Kebenaran AND, OR, NOT</h2>
+            <p class="text-xs text-teal-100/85 leading-relaxed">
+              Ubah nilai input A dan B di bawah ini (atau langsung pada dock 3D di buku) untuk melihat baris aktif pada tabel kebenaran.
+            </p>
+          </div>
+          ${buildInteractiveGateCard('AND', 'andA', 'andB')}
+          ${buildInteractiveGateCard('OR', 'orA', 'orB')}
+          ${buildInteractiveGateCard('NOT', 'notA', null)}
+        `;
+        return;
+      }
+
+      // ---- PANEL HALAMAN 3: NAND, NOR ----
+      if (p === 3) {
+        container.innerHTML = `
+          <div class="space-y-1">
+            <span class="text-[11px] font-mono text-brassLight uppercase tracking-wider">Halaman 3 &bull; Gerbang Universal</span>
+            <h2 class="font-display font-bold text-lg text-white">Tabel Kebenaran NAND &amp; NOR</h2>
+            <p class="text-xs text-teal-100/85 leading-relaxed">
+              Gerbang <strong>NAND</strong> dan <strong>NOR</strong> merupakan kombinasi gerbang dasar dengan gerbang NOT (inverter) di bagian keluarannya.
+            </p>
+          </div>
+          ${buildInteractiveGateCard('NAND', 'nandA', 'nandB')}
+          ${buildInteractiveGateCard('NOR', 'norA', 'norB')}
+        `;
+        return;
+      }
+
+      // ---- PANEL HALAMAN 4: XOR, XNOR ----
+      if (p === 4) {
+        container.innerHTML = `
+          <div class="space-y-1">
+            <span class="text-[11px] font-mono text-brassLight uppercase tracking-wider">Halaman 4 &bull; Gerbang Khusus</span>
+            <h2 class="font-display font-bold text-lg text-white">Tabel Kebenaran XOR &amp; XNOR</h2>
+            <p class="text-xs text-teal-100/85 leading-relaxed">
+              Kedua gerbang ini membandingkan kesamaan nilai input biner dan banyak digunakan pada rangkaian penjumlah (Adder) dan deteksi parity.
+            </p>
+          </div>
+          ${buildInteractiveGateCard('XOR', 'xorA', 'xorB')}
+          ${buildInteractiveGateCard('XNOR', 'xnorA', 'xnorB')}
+        `;
+      }
+    }
+
+    // ---- RENDER PANEL KUIS INTERAKTIF ----
+    function renderQuizPanel(container) {
+      const answeredCount = Object.keys(state.quiz.answers).length;
+      let score = 0;
+      QUIZ_DATA.forEach((item, idx) => {
+        if (state.quiz.answers[idx] === item.correct) score++;
+      });
+
+      container.innerHTML = `
+        <div class="bg-gradient-to-r from-[#143742] to-[#0a1d24] border border-brass/40 rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 class="font-display font-bold text-base text-brassLight">🎯 Kuis Cepat Gerbang Logika</h2>
+            <p class="text-[11px] text-teal-100/80">Terjawab: ${answeredCount} / ${QUIZ_DATA.length} soal</p>
+          </div>
+          <div class="text-right">
+            <div class="font-mono text-lg font-black text-amber-300">${score * 20}</div>
+            <div class="text-[10px] text-teal-200/70">Skor (Maks 100)</div>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          ${QUIZ_DATA.map((item, qIdx) => {
+            const chosen = state.quiz.answers[qIdx];
+            const hasAnswered = chosen !== undefined;
+            const isCorrect = chosen === item.correct;
+
+            return `
+              <div class="bg-[#0a1b22] border border-teal-800/80 rounded-2xl p-3.5 space-y-2.5">
+                <p class="text-xs font-semibold text-amber-50 leading-relaxed">
+                  <span class="text-brassLight font-mono mr-1">${qIdx + 1}.</span>${item.q}
+                </p>
+                <div class="space-y-1.5">
+                  ${item.options.map((opt, oIdx) => {
+                    let cls = 'bg-[#122b35] border-teal-800/70 text-teal-100 hover:bg-[#193b48]';
+                    if (hasAnswered) {
+                      if (oIdx === item.correct) {
+                        cls = 'bg-emerald-500/25 border-emerald-400 text-emerald-200 font-bold';
+                      } else if (oIdx === chosen) {
+                        cls = 'bg-rose-500/25 border-rose-400 text-rose-200 font-bold';
+                      } else {
+                        cls = 'bg-[#0e2129] border-teal-900/50 text-teal-200/50';
+                      }
+                    }
+                    return `
+                      <button onclick="answerQuiz(${qIdx}, ${oIdx})"
+                        class="w-full text-left px-3 py-2 rounded-xl text-xs border transition ${cls}">
+                        ${opt}
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+                ${hasAnswered ? `
+                  <div class="text-[11px] rounded-xl p-2.5 border ${
+                    isCorrect
+                      ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200'
+                      : 'bg-rose-950/50 border-rose-500/40 text-rose-200'
+                  }">
+                    <strong>${isCorrect ? '✅ Benar!' : '❌ Kurang tepat.'}</strong> ${item.explain}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <button onclick="resetQuiz()" class="w-full py-2.5 rounded-xl bg-[#163642] hover:bg-[#1f4959] border border-brass/40 text-xs font-bold text-brassLight transition">
+          🔄 Ulangi Kuis
+        </button>
+      `;
+    }
+
+    function answerQuiz(qIdx, oIdx) {
+      state.quiz.answers[qIdx] = oIdx;
+      playSwitchSound(oIdx === QUIZ_DATA[qIdx].correct);
+      renderRightPanel();
+    }
+
+    function resetQuiz() {
+      state.quiz.answers = {};
+      playSwitchSound(false);
+      renderRightPanel();
+    }
+
+    // =========================================================================
+    // 7. RESPONSIVE SCALING & INITIALIZATION
+    // =========================================================================
+
+    function updateBookScale() {
+      const stage = document.getElementById('stage-3d');
+      const wrapper = document.getElementById('book-scale-wrapper');
+      if (!stage || !wrapper) return;
+
+      // Dimensi acuan tetap konsisten di semua halaman agar tidak ada efek zoom mendadak
+      const stageW = stage.clientWidth - 40;
+      const stageH = stage.clientHeight - 56;
+      const baseW = 820;
+      const baseH = 510;
+
+      const scale = Math.min(stageW / baseW, stageH / baseH, 1.05);
+      wrapper.style.transform = `scale(${Math.max(scale, 0.36)})`;
+    }
+
+    window.addEventListener('resize', updateBookScale);
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') nextPage();
+      if (e.key === 'ArrowLeft') prevPage();
+    });
+
+    window.addEventListener('beforeunload', stopSpeech);
+
+    window.onload = function () {
+      // Preload semua gambar halaman GitHub agar transisi halaman langsung tampil utuh
+      Object.values(GITHUB_IMAGES).forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      });
+      initSpeechVoices();
+      setupDragCamera();
+      setCameraPreset('iso');
+      initPhysicalBookDOM();
+      renderRightPanel();
+      updateBookScale();
+    };
+  </script>
+</body>
+</html>
